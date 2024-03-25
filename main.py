@@ -1,11 +1,13 @@
 import sqlite3
+import tkinter as tk
+from tkinter import messagebox, simpledialog
+
 
 class Lagerverwaltung:
 
     def __init__(self):
         self.con = sqlite3.connect("lagerverwaltung.db")
         self.cur = self.con.cursor()
-        self.create_table()
 
     def create_table(self):
         self.cur.execute(
@@ -37,7 +39,7 @@ class Lagerverwaltung:
         data: List of tuples (name, raum, schrank)
         """
         for item in data:
-            name = item[0]
+            self.name = item[0]
             self.insert_data(*item)
 
     def retrieve_data(self):
@@ -49,15 +51,60 @@ class Lagerverwaltung:
     def close_connection(self):
         self.con.close()
 
-if __name__ == "__main__":
-    lager = Lagerverwaltung()
-    lager.insert_multiple_data([
-        ("WC-Papier", "Sitzungszimmer/Kopierraum", "gegenüber Fenster"),
-        ("Abfallsaecke 35l", "Sitzungszimmer/Kopierraum", "gegenueber Fenster"),
-        ("Abfallsaecke 110l", "Sitzungszimmer/Kopierraum", "gegenueber Fenster"),
-        ("Abfallmarken 35l", "Sitzungszimmer/Kopierraum", "gegenueber Fenster"),
-        ("Abfallmarken 110l", "Sitzungszimmer/Kopierraum", "gegenueber Fenster")
-    ])
-    lager.retrieve_data()
-    lager.close_connection()
 
+class GUI(Lagerverwaltung):
+    def __init__(self, master):
+        super().__init__()
+        self.master = master
+        self.master.title("Datenbank GUI")
+
+        self.entry_listbox = tk.Listbox(master)
+        self.entry_listbox.pack(padx=10, pady=10)
+
+        add_button = tk.Button(master, text="Hinzufügen", command=self.add_entry)
+        add_button.pack(padx=10, pady=5, fill=tk.X)
+
+        delete_button = tk.Button(master, text="Löschen", command=self.delete_entry)
+        delete_button.pack(padx=10, pady=5, fill=tk.X)
+
+        show_image_button = tk.Button(master, text="Bild anzeigen", command=self.show_image)
+        show_image_button.pack(padx=10, pady=5, fill=tk.X)
+
+        close_button = tk.Button(master, text="Fenster schließen", command=master.quit)
+        close_button.pack(padx=10, pady=5, fill=tk.X)
+
+    def add_entry(self):
+        entry = simpledialog.askstring("Neuen Eintrag hinzufügen", "Geben Sie den neuen Eintrag ein:")
+        if entry:
+            self.insert_data(entry, "", "")  # Hier werden die Daten direkt in die Datenbank eingefügt
+            self.update_listbox()
+
+    def delete_entry(self):
+        selected_index = self.entry_listbox.curselection()
+        if selected_index:
+            entry_name = self.entry_listbox.get(selected_index)
+            self.cur.execute("DELETE FROM LAGERVERWALTUNG WHERE Name=?", (entry_name,))
+            self.con.commit()
+            self.update_listbox()
+
+    def show_image(self):
+        # Hier könntest du Code einfügen, um ein Bild anzuzeigen
+        messagebox.showinfo("Bild anzeigen", "Hier würde das Bild angezeigt werden.")
+
+    def update_listbox(self):
+        self.entry_listbox.delete(0, tk.END)
+        self.cur.execute("SELECT Name FROM LAGERVERWALTUNG")
+        rows = self.cur.fetchall()
+        for row in rows:
+            self.entry_listbox.insert(tk.END, row[0])
+
+
+def main():
+    root = tk.Tk()
+    gui = GUI(root)
+    gui.update_listbox()  # Initialisiere die Liste beim Start der Anwendung
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
