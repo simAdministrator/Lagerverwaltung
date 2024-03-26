@@ -1,6 +1,7 @@
 import sqlite3
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox, simpledialog, Toplevel
+from PIL import Image, ImageTk
 
 
 class Lagerverwaltung:
@@ -52,15 +53,58 @@ class Lagerverwaltung:
         self.con.close()
 
 
+class MultiListbox(tk.Frame):
+    def __init__(self, master, columns):
+        tk.Frame.__init__(self, master)
+
+        # Header
+        header_frame = tk.Frame(self)
+        header_frame.pack(fill=tk.X)
+
+        for column in columns:
+            label = tk.Label(header_frame, text=column)
+            label.pack(side=tk.LEFT, padx=5, pady=5)
+
+        # Listbox
+        self.listBox = tk.Listbox(self, selectmode=tk.SINGLE)
+        self.listBox.pack(fill=tk.BOTH, expand=True)
+
+    def insert(self, values):
+        self.listBox.insert(tk.END, values)
+
+    def curselection(self):
+        return self.listBox.curselection()
+
+    def delete(self, first, last=None):
+        self.listBox.delete(first, last)
+
+    def get(self, first, last=None):
+        return self.listBox.get(first, last)
+
+    def size(self):
+        return self.listBox.size()
+
+    def see(self, index):
+        self.listBox.see(index)
+
+    def selection_clear(self, first, last=None):
+        self.listBox.selection_clear(first, last)
+
+    def selection_set(self, first, last=None):
+        self.listBox.selection_set(first, last)
+
+
 class GUI(Lagerverwaltung):
     def __init__(self, master):
         super().__init__()
         self.master = master
         self.master.title("Lagerverwaltung")
 
-        self.entry_listbox = tk.Listbox(master)
-        self.entry_listbox.pack(padx=30, pady=30)
+        # Listbox mit mehreren Spalten
+        self.multi_listbox = MultiListbox(master, ["Name", "Raum", "Schrank"])
+        self.multi_listbox.pack(padx=30, pady=30, fill=tk.BOTH, expand=True)
 
+        # Buttons
         add_button = tk.Button(master, text="Hinzufügen", command=self.add_entry)
         add_button.pack(padx=10, pady=5, fill=tk.X)
 
@@ -74,29 +118,36 @@ class GUI(Lagerverwaltung):
         close_button.pack(padx=10, pady=5, fill=tk.X)
 
     def add_entry(self):
-        entry = simpledialog.askstring("Neuen Eintrag hinzufügen", "Geben Sie den neuen Eintrag ein:")
-        if entry:
-            self.insert_data(entry, "", "")  # Hier werden die Daten direkt in die Datenbank eingefügt
-            self.update_listbox()
+        name = simpledialog.askstring("Neuen Eintrag hinzufügen", "Name:")
+        if name:
+            raum = simpledialog.askstring("Neuen Eintrag hinzufügen", "Raum:")
+            if raum:
+                schrank = simpledialog.askstring("Neuen Eintrag hinzufügen", "Schrank:")
+                if schrank:
+                    self.insert_data(name, raum, schrank)
+                    self.update_listbox()
 
     def delete_entry(self):
-        selected_index = self.entry_listbox.curselection()
+        selected_index = self.multi_listbox.curselection()
         if selected_index:
-            entry_name = self.entry_listbox.get(selected_index)
-            self.cur.execute("DELETE FROM LAGERVERWALTUNG WHERE Name=?", (entry_name,))
+            entry = self.multi_listbox.get(selected_index)
+            self.cur.execute("DELETE FROM LAGERVERWALTUNG WHERE Name=?", (entry[0],))
             self.con.commit()
             self.update_listbox()
 
     def show_image(self):
-        # Hier könntest du Code einfügen, um ein Bild anzuzeigen
-        messagebox.showinfo("Bild anzeigen", "Hier würde das Bild angezeigt werden.")
+        global my_img
+        self.top = Toplevel()
+        self.top.title("Übersicht Schränke")
+        my_img = ImageTk.PhotoImage(Image.open(r"Pictures/overview.jpg"))
+        tk.Label(self.top, image=my_img).pack()
 
     def update_listbox(self):
-        self.entry_listbox.delete(0, tk.END)
-        self.cur.execute("SELECT Name FROM LAGERVERWALTUNG")
+        self.multi_listbox.delete(0, tk.END)
+        self.cur.execute("SELECT * FROM LAGERVERWALTUNG")
         rows = self.cur.fetchall()
         for row in rows:
-            self.entry_listbox.insert(tk.END, row[0])
+            self.multi_listbox.insert(row)
 
 
 def main():
