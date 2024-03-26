@@ -2,7 +2,7 @@ import sqlite3
 import tkinter as tk
 from tkinter import messagebox, simpledialog, Toplevel
 from PIL import Image, ImageTk
-
+import datetime
 
 class Lagerverwaltung:
 
@@ -13,31 +13,39 @@ class Lagerverwaltung:
     def create_table(self):
         self.cur.execute(
             """CREATE TABLE IF NOT EXISTS LAGERVERWALTUNG(
-            Name TEXT,
+            Datum DATE
+            Bezeichnung TEXT,
+            Typ TEXT,
+            Menge INT,
             Raum TEXT,
             Schrank TEXT,
-            CONSTRAINT name_unique UNIQUE (Name));"""
+            CONSTRAINT Datum_unique UNIQUE (Datum));
+            CONSTRAINT Bezeichnung_unique UNIQUE (Bezeichnung));
+            CONSTRAINT Typ_unique UNIQUE (Typ));
+            CONSTRAINT Menge_unique UNIQUE (Menge));
+            CONSTRAINT Raum_unique UNIQUE (Raum));
+            CONSTRAINT Schrank_unique UNIQUE (Schrank));"""
         )
         self.con.commit()
 
-    def insert_data(self, name, raum, schrank):
+    def insert_data(self, Datum, Bezeichnung, Typ, Menge, Raum, Schrank):
         # Überprüfen, ob der Artikel bereits existiert
-        self.cur.execute("SELECT Name FROM LAGERVERWALTUNG WHERE Name=?", (name,))
+        self.cur.execute("SELECT Name FROM LAGERVERWALTUNG WHERE Name=?", (Datum,Bezeichnung,Typ,Menge,Raum,Schrank ))
         existing_row = self.cur.fetchone()
         if existing_row:
-            print(f"Der Artikel '{name}' existiert bereits im Lager.")
+            print(f"Der Artikel '{Typ}' existiert bereits im Lager.")
         else:
             self.cur.execute(
                 """INSERT INTO LAGERVERWALTUNG (Name, Raum, Schrank)
-                VALUES (?, ?, ?)""", (name, raum, schrank)
+                VALUES (?, ?, ?)""", (Datum, Bezeichnung, Typ, Menge, Raum, Schrank)
             )
             self.con.commit()
-            print(f"Der Artikel '{name}' wurde erfolgreich hinzugefügt.")
+            print(f"Der Artikel '{Bezeichnung}' wurde erfolgreich hinzugefügt.")
 
     def insert_multiple_data(self, data):
         """
         Insert multiple records at once
-        data: List of tuples (name, raum, schrank)
+        data: List of tuples (Datum, Bezeichnung, Typ, Menge, Raum, Schrank)
         """
         for item in data:
             self.name = item[0]
@@ -101,12 +109,15 @@ class GUI(Lagerverwaltung):
         self.master.title("Lagerverwaltung")
 
         # Listbox mit mehreren Spalten
-        self.multi_listbox = MultiListbox(master, ["Name", "Raum", "Schrank"])
+        self.multi_listbox = MultiListbox(master, ["Datum", "Bezeichnung", "Typ", "Menge", "Raum", "Schranknummer"])
         self.multi_listbox.pack(padx=30, pady=30, fill=tk.BOTH, expand=True)
 
         # Buttons
         add_button = tk.Button(master, text="Hinzufügen", command=self.add_entry)
         add_button.pack(padx=10, pady=5, fill=tk.X)
+
+        edit_button = tk.Button(master, text="Bearbeiten", command=self.add_entry)
+        edit_button.pack(padx=10, pady=5, fill=tk.X)
 
         delete_button = tk.Button(master, text="Löschen", command=self.delete_entry)
         delete_button.pack(padx=10, pady=5, fill=tk.X)
@@ -152,6 +163,7 @@ class GUI(Lagerverwaltung):
 
 def main():
     root = tk.Tk()
+    root.geometry("900x700")
     gui = GUI(root)
     gui.update_listbox()  # Initialisiere die Liste beim Start der Anwendung
     root.mainloop()
