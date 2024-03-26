@@ -6,7 +6,7 @@ from tkinter import messagebox, simpledialog
 class Lagerverwaltung:
 
     def __init__(self):
-        self.con = sqlite3.connect("lagerverwaltung.db")
+        self.con = sqlite3.connect("management.db")
         self.cur = self.con.cursor()
 
     def create_table(self):
@@ -56,10 +56,10 @@ class GUI(Lagerverwaltung):
     def __init__(self, master):
         super().__init__()
         self.master = master
-        self.master.title("Datenbank GUI")
+        self.master.title("Lagerverwaltung")
 
         self.entry_listbox = tk.Listbox(master)
-        self.entry_listbox.pack(padx=10, pady=10)
+        self.entry_listbox.pack(padx=30, pady=30)
 
         add_button = tk.Button(master, text="Hinzufügen", command=self.add_entry)
         add_button.pack(padx=10, pady=5, fill=tk.X)
