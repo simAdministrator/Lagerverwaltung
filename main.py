@@ -1,6 +1,6 @@
 import sqlite3
 import tkinter as tk
-from tkinter import messagebox, simpledialog, Toplevel
+from tkinter import simpledialog, Toplevel
 from PIL import Image, ImageTk
 import datetime
 
@@ -116,7 +116,7 @@ class GUI(Lagerverwaltung):
         add_button = tk.Button(master, text="Hinzufügen", command=self.add_entry)
         add_button.pack(padx=10, pady=5, fill=tk.X)
 
-        edit_button = tk.Button(master, text="Bearbeiten", command=self.add_entry)
+        edit_button = tk.Button(master, text="Bearbeiten", command=self.edit_entry)
         edit_button.pack(padx=10, pady=5, fill=tk.X)
 
         delete_button = tk.Button(master, text="Löschen", command=self.delete_entry)
@@ -137,6 +137,21 @@ class GUI(Lagerverwaltung):
                 if schrank:
                     self.insert_data(name, raum, schrank)
                     self.update_listbox()
+
+    def edit_entry(self):
+        selected_index = self.multi_listbox.curselection()
+        if selected_index:
+            entry = self.multi_listbox.get(selected_index)
+            old_name = entry[0]
+            new_name = simpledialog.askstring("Eintrag bearbeiten", "Neue Bezeichnung:", initialvalue=old_name)
+            if new_name:
+                new_raum = simpledialog.askstring("Eintrag bearbeiten", "Neuer Raum:")
+                if new_raum:
+                    new_schrank = simpledialog.askstring("Eintrag bearbeiten", "Neue Schranknummer:")
+                    if new_schrank:
+                        self.cur.execute("UPDATE LAGERVERWALTUNG SET Name=?, Raum=?, Schrank=? WHERE Name=?", (new_name, new_raum, new_schrank, old_name))
+                        self.con.commit()
+                        self.update_listbox()
 
     def delete_entry(self):
         selected_index = self.multi_listbox.curselection()
