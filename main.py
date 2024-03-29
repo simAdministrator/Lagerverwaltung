@@ -1,7 +1,6 @@
 import sqlite3
-import tkinter as tk
-from tkinter import simpledialog, Toplevel
-from PIL import Image, ImageTk
+import sys
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QLabel, QLineEdit
 import datetime
 
 class Lagerverwaltung:
@@ -61,128 +60,82 @@ class Lagerverwaltung:
         self.con.close()
 
 
-class MultiListbox(tk.Frame):
-    def __init__(self, master, columns):
-        tk.Frame.__init__(self, master)
-
-        # Header
-        header_frame = tk.Frame(self)
-        header_frame.pack(fill=tk.X)
-
-        for column in columns:
-            label = tk.Label(header_frame, text=column)
-            label.pack(side=tk.LEFT, padx=5, pady=5)
-
-        # Listbox
-        self.listBox = tk.Listbox(self, selectmode=tk.SINGLE)
-        self.listBox.pack(fill=tk.BOTH, expand=True)
-
-    def insert(self, values):
-        self.listBox.insert(tk.END, values)
-
-    def curselection(self):
-        return self.listBox.curselection()
-
-    def delete(self, first, last=None):
-        self.listBox.delete(first, last)
-
-    def get(self, first, last=None):
-        return self.listBox.get(first, last)
-
-    def size(self):
-        return self.listBox.size()
-
-    def see(self, index):
-        self.listBox.see(index)
-
-    def selection_clear(self, first, last=None):
-        self.listBox.selection_clear(first, last)
-
-    def selection_set(self, first, last=None):
-        self.listBox.selection_set(first, last)
-
-
-class GUI(Lagerverwaltung):
-    def __init__(self, master):
+class MainWindow(QMainWindow):
+    def __init__(self):
         super().__init__()
-        self.master = master
-        self.master.title("Lagerverwaltung")
 
-        # Listbox mit mehreren Spalten
-        self.multi_listbox = MultiListbox(master, ["Datum", "Bezeichnung", "Typ", "Menge", "Raum", "Schranknummer"])
-        self.multi_listbox.pack(padx=30, pady=30, fill=tk.BOTH, expand=True)
+        self.setWindowTitle("Lagerverwaltung")
+        self.setGeometry(300, 300, 600, 400)
 
-        # Buttons
-        add_button = tk.Button(master, text="Hinzufügen", command=self.add_entry)
-        add_button.pack(padx=10, pady=5, fill=tk.X)
+        self.lagerverwaltung = Lagerverwaltung()
 
-        edit_button = tk.Button(master, text="Bearbeiten", command=self.edit_entry)
-        edit_button.pack(padx=10, pady=5, fill=tk.X)
+        self.initUI()
 
-        delete_button = tk.Button(master, text="Löschen", command=self.delete_entry)
-        delete_button.pack(padx=10, pady=5, fill=tk.X)
+    def initUI(self):
+        # Hauptwidget erstellen
+        main_widget = QWidget()
+        self.setCentralWidget(main_widget)
 
-        show_image_button = tk.Button(master, text="Bild anzeigen", command=self.show_image)
-        show_image_button.pack(padx=10, pady=5, fill=tk.X)
+        # Layouts erstellen
+        main_layout = QVBoxLayout()
+        table_layout = QVBoxLayout()
+        button_layout = QHBoxLayout()
 
-        close_button = tk.Button(master, text="Fenster schließen", command=master.quit)
-        close_button.pack(padx=10, pady=5, fill=tk.X)
+        # Suchfeld erstellen
+        search_field = QLineEdit()
+        search_field.setPlaceholderText("Suchen...")
 
-    def add_entry(self):
-        name = simpledialog.askstring("Neuen Eintrag hinzufügen", "Name:")
-        if name:
-            raum = simpledialog.askstring("Neuen Eintrag hinzufügen", "Raum:")
-            if raum:
-                schrank = simpledialog.askstring("Neuen Eintrag hinzufügen", "Schrank:")
-                if schrank:
-                    self.insert_data(name, raum, schrank)
-                    self.update_listbox()
+        # Buttons erstellen
+        btn_add = QPushButton("Hinzufügen")
+        btn_edit = QPushButton("Bearbeiten")
+        btn_delete = QPushButton("Löschen")
+        btn_exit = QPushButton("Beenden")
 
-    def edit_entry(self):
-        selected_index = self.multi_listbox.curselection()
-        if selected_index:
-            entry = self.multi_listbox.get(selected_index)
-            old_name = entry[0]
-            new_name = simpledialog.askstring("Eintrag bearbeiten", "Neue Bezeichnung:", initialvalue=old_name)
-            if new_name:
-                new_raum = simpledialog.askstring("Eintrag bearbeiten", "Neuer Raum:")
-                if new_raum:
-                    new_schrank = simpledialog.askstring("Eintrag bearbeiten", "Neue Schranknummer:")
-                    if new_schrank:
-                        self.cur.execute("UPDATE LAGERVERWALTUNG SET Name=?, Raum=?, Schrank=? WHERE Name=?", (new_name, new_raum, new_schrank, old_name))
-                        self.con.commit()
-                        self.update_listbox()
+        # Button-Layout konfigurieren
+        button_layout.addWidget(btn_add)
+        button_layout.addWidget(btn_edit)
+        button_layout.addWidget(btn_delete)
+        button_layout.addStretch()  # Stretch, um Suchfeld rechts zu halten
+        button_layout.addWidget(search_field)
+        button_layout.addWidget(btn_exit)
 
-    def delete_entry(self):
-        selected_index = self.multi_listbox.curselection()
-        if selected_index:
-            entry = self.multi_listbox.get(selected_index)
-            self.cur.execute("DELETE FROM LAGERVERWALTUNG WHERE Name=?", (entry[0],))
-            self.con.commit()
-            self.update_listbox()
+        # Tabellenwidget erstellen
+        table_widget = QTableWidget()
+        table_widget.setColumnCount(6)
+        table_widget.setHorizontalHeaderLabels(["Datum", "Bezeichnung", "Typ", "Menge", "Raum", "Schranknummer"])
 
-    def show_image(self):
-        global my_img
-        self.top = Toplevel()
-        self.top.title("Übersicht Schränke")
-        my_img = ImageTk.PhotoImage(Image.open(r"Pictures/overview.jpg"))
-        tk.Label(self.top, image=my_img).pack()
+        # Tabelle in Layout einfügen
+        table_layout.addWidget(QLabel("Lagerverzeichnis:"))
+        table_layout.addWidget(table_widget)
 
-    def update_listbox(self):
-        self.multi_listbox.delete(0, tk.END)
-        self.cur.execute("SELECT * FROM LAGERVERWALTUNG")
-        rows = self.cur.fetchall()
-        for row in rows:
-            self.multi_listbox.insert(row)
+        # Hauptlayout konfigurieren
+        main_layout.addLayout(button_layout)
+        main_layout.addLayout(table_layout)
 
+        # Hauptwidget-Layout einstellen
+        main_widget.setLayout(main_layout)
 
-def main():
-    root = tk.Tk()
-    root.geometry("900x700")
-    gui = GUI(root)
-    gui.update_listbox()  # Initialisiere die Liste beim Start der Anwendung
-    root.mainloop()
+        # Signale und Slots verbinden
+        btn_add.clicked.connect(self.add_data)
+        btn_edit.clicked.connect(self.edit_data)
+        btn_delete.clicked.connect(self.delete_data)
+        btn_exit.clicked.connect(self.close)
 
+        self.show()
+
+    def add_data(self):
+        # Hier könntest du die Eingabefelder für das Hinzufügen von Daten anzeigen
+        pass
+
+    def edit_data(self):
+        # Hier könntest du die Bearbeitung von Daten implementieren, z.B. indem du die ausgewählte Zeile der Tabelle bearbeitbar machst
+        pass
+
+    def delete_data(self):
+        # Hier könntest du die ausgewählte Zeile der Tabelle löschen
+        pass
 
 if __name__ == "__main__":
-    main()
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    sys.exit(app.exec_())
