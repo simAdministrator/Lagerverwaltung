@@ -2,12 +2,13 @@ import sys
 import sqlite3
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, \
     QLineEdit, QTextEdit, QMessageBox, QTableWidgetItem, QTableWidget, QDialog, QFormLayout
+from PyQt5.QtGui import QPixmap
 
 
 class Lagerverwaltung:
 
     def __init__(self):
-        self.connection = sqlite3.connect("lager.db")
+        self.connection = sqlite3.connect("C:\\Projekte\\Python\\Lagerverwaltung\\lagerverwaltung.db")
         self.cursor = self.connection.cursor()
         self.create_table()
 
@@ -63,6 +64,11 @@ class LagerGUI(QMainWindow):
 
         main_layout = QVBoxLayout()
         main_widget.setLayout(main_layout)
+
+        foto_button = QPushButton("Foto anzeigen")
+        foto_button.setFixedSize(100, 30)  # Set width to 100 pixels and height to 30 pixels
+        foto_button.clicked.connect(self.show_image)
+        main_layout.addWidget(foto_button)
 
         self.table_widget = QTableWidget()
         self.table_widget.setColumnCount(6)
@@ -145,6 +151,18 @@ class LagerGUI(QMainWindow):
         else:
             self.update_table()
 
+    def show_image(self):
+        # Display image in a message box
+        image_path = "C:\\Projekte\\Python\\Lagerverwaltung\\Pictures\\overview.jpg"
+        pixmap = QPixmap(image_path)
+        if pixmap.isNull():
+            QMessageBox.warning(self, "Warnung", "Das Bild konnte nicht gefunden werden.")
+
+        else:
+            msg_box = QMessageBox()
+            msg_box.setWindowTitle("Foto anzeigen")
+            msg_box.setIconPixmap(pixmap)
+            msg_box.exec_()
 
 class ArtikelDialog(QDialog):
     def __init__(self, edit_mode=False, parent=None):
