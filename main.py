@@ -1,264 +1,201 @@
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QLabel, QLineEdit, QDialog, QFormLayout, QMessageBox
-from PyQt5.QtGui import QPixmap
-import sqlite3
 import sys
-import os
+import sqlite3
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, \
+    QLineEdit, QTextEdit, QMessageBox, QTableWidgetItem, QTableWidget, QDialog, QFormLayout
 
 
 class Lagerverwaltung:
 
     def __init__(self):
-        self.con = sqlite3.connect("management.db")
-        self.cur = self.con.cursor()
+        self.connection = sqlite3.connect("lager.db")
+        self.cursor = self.connection.cursor()
+        self.create_table()
 
     def create_table(self):
-        self.cur.execute(
-            """CREATE TABLE IF NOT EXISTS LAGERVERWALTUNG(
-            Datum TEXT,
-            Bezeichnung TEXT,
-            Typ TEXT,
-            Menge INT,
-            Raum TEXT,
-            Schrank TEXT
-            )"""
-        )
-        self.con.commit()
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS artikel (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                bezeichnung TEXT,
+                                typ TEXT,
+                                menge INTEGER,
+                                raum TEXT,
+                                schrank INTEGER
+                                )""")
+        self.connection.commit()
 
-    def insert_data(self, Datum, Bezeichnung, Typ, Menge, Raum, Schrank):
-    # Überprüfen, ob der Artikel bereits existiert
-        self.cur.execute("SELECT * FROM LAGERVERWALTUNG WHERE Bezeichnung=? AND Typ=? AND Menge=? AND Raum=? AND Schrank=?", (Bezeichnung, Typ, Menge, Raum, Schrank))
-        existing_row = self.cur.fetchone()
+    def insert_artikel(self, bezeichnung, typ, menge, raum, schrank):
+        self.cursor.execute("INSERT INTO artikel (bezeichnung, typ, menge, raum, schrank) VALUES (?, ?, ?, ?, ?)",
+                            (bezeichnung, typ, menge, raum, schrank))
+        self.connection.commit()
 
-        if existing_row:
-            print(f"Der Artikel '{Bezeichnung}' existiert bereits im Lager.")
-        else:
-            self.cur.execute("""INSERT OR REPLACE INTO LAGERVERWALTUNG (Datum, Bezeichnung, Typ, Menge, Raum, Schrank)
-            VALUES (?, ?, ?, ?, ?, ?)""", (Datum, Bezeichnung, Typ, Menge, Raum, Schrank)
-            )
-        self.con.commit()
-        print(f"Der Artikel '{Bezeichnung}' wurde erfolgreich hinzugefügt.")
+    def update_artikel(self, artikel_id, bezeichnung, typ, menge, raum, schrank):
+        self.cursor.execute("UPDATE artikel SET bezeichnung=?, typ=?, menge=?, raum=?, schrank=? WHERE id=?",
+                            (bezeichnung, typ, menge, raum, schrank, artikel_id))
+        self.connection.commit()
 
+    def delete_artikel(self, artikel_id):
+        self.cursor.execute("DELETE FROM artikel WHERE id=?", (artikel_id,))
+        self.connection.commit()
 
-    def retrieve_data(self):
-        self.cur.execute("SELECT * FROM LAGERVERWALTUNG")
-        return self.cur.fetchall()
+    def search_artikel(self, bezeichnung):
+        self.cursor.execute("SELECT * FROM artikel WHERE bezeichnung LIKE ?", ('%' + bezeichnung + '%',))
+        return self.cursor.fetchall()
 
-    def update_data(self, id, Datum, Bezeichnung, Typ, Menge, Raum, Schrank):
-        self.cur.execute("""
-            UPDATE LAGERVERWALTUNG 
-            SET Datum=?, Bezeichnung=?, Typ=?, Menge=?, Raum=?, Schrank=?
-            WHERE rowid=?
-        """, (Datum, Bezeichnung, Typ, Menge, Raum, Schrank, id))
-        self.con.commit()
-
-    def delete_data(self, id):
-        self.cur.execute("DELETE FROM LAGERVERWALTUNG WHERE rowid=?", (id,))
-        self.con.commit()
-
-    def close_connection(self):
-        self.con.close()
+    def get_all_artikel(self):
+        self.cursor.execute("SELECT * FROM artikel")
+        return self.cursor.fetchall()
 
 
-class AddDataDialog(QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Daten hinzufügen")
-        self.setModal(True)
+class LagerGUI(QMainWindow):
 
-        layout = QFormLayout()
-
-        self.date_edit = QLineEdit()
-        self.name_edit = QLineEdit()
-        self.type_edit = QLineEdit()
-        self.quantity_edit = QLineEdit()
-        self.room_edit = QLineEdit()
-        self.cabinet_edit = QLineEdit()
-        self.cabinet_edit.returnPressed.connect(self.accept)  # Verbindung zu ReturnPressed
-
-        layout.addRow("Datum:", self.date_edit)
-        layout.addRow("Bezeichnung:", self.name_edit)
-        layout.addRow("Typ:", self.type_edit)
-        layout.addRow("Menge:", self.quantity_edit)
-        layout.addRow("Raum:", self.room_edit)
-        layout.addRow("Schranknummer:", self.cabinet_edit)
-
-        self.btn_add = QPushButton("Hinzufügen")
-        self.btn_cancel = QPushButton("Abbrechen")
-        self.btn_add.clicked.connect(self.accept)
-        self.btn_cancel.clicked.connect(self.reject)
-
-        layout.addRow(self.btn_add, self.btn_cancel)
-        self.setLayout(layout)
-
-    def get_data(self):
-        return (
-            self.date_edit.text(),
-            self.name_edit.text(),
-            self.type_edit.text(),
-            int(self.quantity_edit.text()),
-            self.room_edit.text(),
-            self.cabinet_edit.text()
-        )
-
-
-class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("Lagerverwaltung")
-        self.setGeometry(300, 300, 600, 400)
+        self.setGeometry(100, 100, 800, 600)
 
         self.lagerverwaltung = Lagerverwaltung()
 
         self.initUI()
 
     def initUI(self):
-        # Hauptwidget erstellen
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
 
-        # Layouts erstellen
         main_layout = QVBoxLayout()
-        button_layout = QHBoxLayout()
-        table_layout = QVBoxLayout()
-
-        # Suchfeld erstellen
-        self.search_field = QLineEdit()
-        self.search_field.setPlaceholderText("Suchen...")
-        self.search_field.textChanged.connect(self.filter_table)
-
-        # Button "Bild anzeigen" erstellen
-        self.btn_show_image = QPushButton("Bild anzeigen")
-        self.btn_show_image.clicked.connect(self.show_image)
-
-        # Buttons erstellen
-        btn_add = QPushButton("Hinzufügen")
-        btn_edit = QPushButton("Bearbeiten")
-        btn_delete = QPushButton("Löschen")
-        btn_exit = QPushButton("Beenden")
-
-        # Button-Layout konfigurieren
-        button_layout.addWidget(self.btn_show_image)
-        button_layout.addWidget(btn_add)
-        button_layout.addWidget(btn_edit)
-        button_layout.addWidget(btn_delete)
-        button_layout.addWidget(self.search_field)
-        button_layout.addWidget(btn_exit)
-
-        # Tabellenwidget erstellen
-        self.table_widget = QTableWidget()
-        self.table_widget.setColumnCount(6)
-        self.table_widget.setHorizontalHeaderLabels(["Datum", "Bezeichnung", "Typ", "Menge", "Raum", "Schranknummer"])
-
-        # Tabelle in Layout einfügen
-        table_layout.addWidget(QLabel("Lagerverzeichnis:"))
-        table_layout.addWidget(self.table_widget)
-
-        # Hauptlayout konfigurieren
-        main_layout.addLayout(button_layout)
-        main_layout.addLayout(table_layout)
-
-        # Hauptwidget-Layout einstellen
         main_widget.setLayout(main_layout)
 
-        # Signale und Slots verbinden
-        btn_add.clicked.connect(self.add_data)
-        btn_edit.clicked.connect(self.edit_data)
-        btn_delete.clicked.connect(self.delete_data)
-        btn_exit.clicked.connect(self.close)
-
-        # Daten in die Tabelle einfügen
+        self.table_widget = QTableWidget()
+        self.table_widget.setColumnCount(6)
+        self.table_widget.setHorizontalHeaderLabels(["ID", "Bezeichnung", "Typ", "Menge", "Raum", "Schrank"])
         self.update_table()
 
-        self.show()
+        main_layout.addWidget(self.table_widget)
 
-    def add_data(self):
-        dialog = AddDataDialog()
-        if dialog.exec_():
-            data = dialog.get_data()
-            existing_items = [(self.table_widget.item(row, 1).text(), self.table_widget.item(row, 2).text()) for row in range(self.table_widget.rowCount())]
-            if (data[1], data[2]) not in existing_items:
-                self.lagerverwaltung.insert_data(*data)
-                self.update_table()  
-            else:
-                QMessageBox.warning(self, "Warnung", "Der Typ oder die Bezeichnung existiert bereits.")
+        button_layout = QHBoxLayout()
+        main_layout.addLayout(button_layout)
 
+        self.search_field = QLineEdit()
+        button_layout.addWidget(self.search_field)
 
-    def edit_data(self):
+        search_button = QPushButton("Suchen")
+        search_button.clicked.connect(self.search_artikel)
+        button_layout.addWidget(search_button)
 
-        selected_items = self.table_widget.selectedItems()
-        if selected_items:
-            # Nur die erste ausgewählte Zelle verwenden, um die Zeilennummer zu erhalten
-            row = selected_items[0].row()
-            dialog = AddDataDialog()
-            
-            for col in range(self.table_widget.columnCount()):
-                dialog_layout_item = dialog.layout().itemAt(col * 2, QFormLayout.FieldRole)
-                if dialog_layout_item is not None:
-                    widget = dialog_layout_item.widget()
-                    if widget is not None:
-                        widget.setText(self.table_widget.item(row, col).text())
-            if dialog.exec_():
-                data = dialog.get_data()
-                self.lagerverwaltung.update_data(row + 1, *data)  # Verwende row + 1, da Zeilenindex 0-basiert ist
-                self.update_table()
+        add_button = QPushButton("Hinzufügen")
+        add_button.clicked.connect(self.add_artikel)
+        button_layout.addWidget(add_button)
 
-    def delete_data(self):
-        selected_rows = set(index.row() for index in self.table_widget.selectedIndexes())
-        if selected_rows:
-            reply = QMessageBox.question(self, 'Bestätigung', 'Möchten Sie die ausgewählte Zeile(n) löschen?', QMessageBox.Yes | QMessageBox.No)
-            if reply == QMessageBox.Yes:
-                for row in sorted(selected_rows, reverse=True):
-                    self.lagerverwaltung.delete_data(row + 1)  # Verwende row + 1, da Zeilenindex 0-basiert ist
-                self.update_table()  
-        else:
-            QMessageBox.information(self, 'Information', 'Bitte wählen Sie zuerst eine Zeile aus.')
+        edit_button = QPushButton("Bearbeiten")
+        edit_button.clicked.connect(self.edit_artikel)
+        button_layout.addWidget(edit_button)
 
-
-    def delete_selected_row(self):
-        selected_rows = set(index.row() for index in self.table_widget.selectedIndexes())
-        for row in sorted(selected_rows, reverse=True):
-            self.lagerverwaltung.delete_data(row + 1)  # Verwende row + 1, da Zeilenindex 0-basiert ist
-        self.update_table()  
+        delete_button = QPushButton("Löschen")
+        delete_button.clicked.connect(self.delete_artikel)
+        button_layout.addWidget(delete_button)
 
     def update_table(self):
-        # Daten aus der Datenbank abrufen und in die Tabelle einfügen
-        data = self.lagerverwaltung.retrieve_data()
-        self.table_widget.setRowCount(len(data))
-        for row_idx, row_data in enumerate(data):
-            for col_idx, cell_data in enumerate(row_data):
-                self.table_widget.setItem(row_idx, col_idx, QTableWidgetItem(str(cell_data)))
+        self.table_widget.setRowCount(0)
+        artikel_list = self.lagerverwaltung.get_all_artikel()
+        for row_number, row_data in enumerate(artikel_list):
+            self.table_widget.insertRow(row_number)
+            for column_number, data in enumerate(row_data):
+                self.table_widget.setItem(row_number, column_number, QTableWidgetItem(str(data)))
 
-    def show_image(self):
-       
-        image_path = "Pictures/overview.jpg"
-        if os.path.exists(image_path):
-            pixmap = QPixmap(image_path)
-            if not pixmap.isNull():
-                # Widget erstellen, wenn es nicht existiert
-                if not hasattr(self, 'image_viewer'):
-                    self.image_viewer = QLabel()
-                self.image_viewer.setPixmap(pixmap)
-                self.image_viewer.setWindowTitle("Bild anzeigen")
-                self.image_viewer.show()
-            else:
-                QMessageBox.warning(self, "Fehler", "Das Bild konnte nicht angezeigt werden.")
+    def add_artikel(self):
+        dialog = ArtikelDialog()
+        if dialog.exec_():
+            bezeichnung, typ, menge, raum, schrank = dialog.get_data()
+            self.lagerverwaltung.insert_artikel(bezeichnung, typ, menge, raum, schrank)
+            self.update_table()
+
+    def edit_artikel(self):
+        selected_row = self.table_widget.currentRow()
+        if selected_row != -1:
+            artikel_id = int(self.table_widget.item(selected_row, 0).text())
+            dialog = ArtikelDialog(edit_mode=True)
+            dialog.set_data(*self.lagerverwaltung.get_all_artikel()[selected_row][1:])
+            if dialog.exec_():
+                bezeichnung, typ, menge, raum, schrank = dialog.get_data()
+                self.lagerverwaltung.update_artikel(artikel_id, bezeichnung, typ, menge, raum, schrank)
+                self.update_table()
         else:
-            QMessageBox.warning(self, "Fehler", "Das Bild konnte nicht gefunden werden.")
+            QMessageBox.warning(self, "Warnung", "Bitte wählen Sie einen Artikel zum Bearbeiten aus.")
 
-    def filter_table(self):
-        search_text = self.search_field.text().lower()
-        for row in range(self.table_widget.rowCount()):
-            row_hidden = True
-            for col in range(self.table_widget.columnCount()):
-                item = self.table_widget.item(row, col)
-                if item is not None and search_text in item.text().lower():
-                    row_hidden = False
-                    break
-            self.table_widget.setRowHidden(row, row_hidden)
+    def delete_artikel(self):
+        selected_row = self.table_widget.currentRow()
+        if selected_row != -1:
+            artikel_id = int(self.table_widget.item(selected_row, 0).text())
+            reply = QMessageBox.question(self, 'Löschen', 'Möchten Sie den ausgewählten Artikel löschen?',
+                                         QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.lagerverwaltung.delete_artikel(artikel_id)
+                self.update_table()
+        else:
+            QMessageBox.warning(self, "Warnung", "Bitte wählen Sie einen Artikel zum Löschen aus.")
+
+    def search_artikel(self):
+        search_text = self.search_field.text()
+        if search_text.strip() != "":
+            artikel_list = self.lagerverwaltung.search_artikel(search_text)
+            self.table_widget.setRowCount(0)
+            for row_number, row_data in enumerate(artikel_list):
+                self.table_widget.insertRow(row_number)
+                for column_number, data in enumerate(row_data):
+                    self.table_widget.setItem(row_number, column_number, QTableWidgetItem(str(data)))
+        else:
+            self.update_table()
+
+
+class ArtikelDialog(QDialog):
+    def __init__(self, edit_mode=False, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Artikel")
+        self.setModal(True)
+
+        layout = QFormLayout()
+
+        self.bezeichnung_edit = QLineEdit()
+        layout.addRow("Bezeichnung:", self.bezeichnung_edit)
+
+        self.typ_edit = QLineEdit()
+        layout.addRow("Typ:", self.typ_edit)
+
+        self.menge_edit = QLineEdit()
+        layout.addRow("Menge:", self.menge_edit)
+
+        self.raum_edit = QLineEdit()
+        layout.addRow("Raum:", self.raum_edit)
+
+        self.schrank_edit = QLineEdit()
+        layout.addRow("Schrank:", self.schrank_edit)
+
+        self.btn_ok = QPushButton("OK")
+        self.btn_ok.clicked.connect(self.accept)
+        layout.addWidget(self.btn_ok)
+
+        self.setLayout(layout)
+
+        self.edit_mode = edit_mode
+
+    def set_data(self, bezeichnung, typ, menge, raum, schrank):
+        self.bezeichnung_edit.setText(bezeichnung)
+        self.typ_edit.setText(typ)
+        self.menge_edit.setText(str(menge))
+        self.raum_edit.setText(raum)
+        self.schrank_edit.setText(str(schrank))
+
+    def get_data(self):
+        return (
+            self.bezeichnung_edit.text(),
+            self.typ_edit.text(),
+            int(self.menge_edit.text()),
+            self.raum_edit.text(),
+            int(self.schrank_edit.text())
+        )
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainWindow()
+    window = LagerGUI()
+    window.show()
     sys.exit(app.exec_())
