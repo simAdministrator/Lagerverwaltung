@@ -19,30 +19,25 @@ class Lagerverwaltung:
             Typ TEXT,
             Menge INT,
             Raum TEXT,
-            Schrank TEXT,
-            CONSTRAINT Datum_unique UNIQUE (Datum),
-            CONSTRAINT Bezeichnung_unique UNIQUE (Bezeichnung),
-            CONSTRAINT Typ_unique UNIQUE (Typ),
-            CONSTRAINT Menge_unique UNIQUE (Menge),
-            CONSTRAINT Raum_unique UNIQUE (Raum),
-            CONSTRAINT Schrank_unique UNIQUE (Schrank)
+            Schrank TEXT
             )"""
         )
         self.con.commit()
 
     def insert_data(self, Datum, Bezeichnung, Typ, Menge, Raum, Schrank):
-        # Überprüfen, ob der Artikel bereits existiert
-        self.cur.execute("SELECT * FROM LAGERVERWALTUNG")
+    # Überprüfen, ob der Artikel bereits existiert
+        self.cur.execute("SELECT * FROM LAGERVERWALTUNG WHERE Bezeichnung=? AND Typ=? AND Menge=? AND Raum=? AND Schrank=?", (Bezeichnung, Typ, Menge, Raum, Schrank))
         existing_row = self.cur.fetchone()
+
         if existing_row:
             print(f"Der Artikel '{Bezeichnung}' existiert bereits im Lager.")
         else:
-            self.cur.execute(
-                """INSERT INTO LAGERVERWALTUNG (Datum, Bezeichnung, Typ, Menge, Raum, Schrank)
-                VALUES (?, ?, ?, ?, ?, ?)""", (Datum, Bezeichnung, Typ, Menge, Raum, Schrank)
+            self.cur.execute("""INSERT OR REPLACE INTO LAGERVERWALTUNG (Datum, Bezeichnung, Typ, Menge, Raum, Schrank)
+            VALUES (?, ?, ?, ?, ?, ?)""", (Datum, Bezeichnung, Typ, Menge, Raum, Schrank)
             )
-            self.con.commit()
-            print(f"Der Artikel '{Bezeichnung}' wurde erfolgreich hinzugefügt.")
+        self.con.commit()
+        print(f"Der Artikel '{Bezeichnung}' wurde erfolgreich hinzugefügt.")
+
 
     def retrieve_data(self):
         self.cur.execute("SELECT * FROM LAGERVERWALTUNG")
@@ -78,6 +73,7 @@ class AddDataDialog(QDialog):
         self.quantity_edit = QLineEdit()
         self.room_edit = QLineEdit()
         self.cabinet_edit = QLineEdit()
+        self.cabinet_edit.returnPressed.connect(self.accept)  # Verbindung zu ReturnPressed
 
         layout.addRow("Datum:", self.date_edit)
         layout.addRow("Bezeichnung:", self.name_edit)
@@ -180,17 +176,22 @@ class MainWindow(QMainWindow):
         dialog = AddDataDialog()
         if dialog.exec_():
             data = dialog.get_data()
-            self.lagerverwaltung.insert_data(*data)
-            self.update_table()  # Tabelle aktualisieren
+            existing_items = [(self.table_widget.item(row, 1).text(), self.table_widget.item(row, 2).text()) for row in range(self.table_widget.rowCount())]
+            if (data[1], data[2]) not in existing_items:
+                self.lagerverwaltung.insert_data(*data)
+                self.update_table()  
+            else:
+                QMessageBox.warning(self, "Warnung", "Der Typ oder die Bezeichnung existiert bereits.")
+
 
     def edit_data(self):
-        # Hier könntest du die Bearbeitung von Daten implementieren, z.B. indem du die ausgewählte Zeile der Tabelle bearbeitbar machst
+
         selected_items = self.table_widget.selectedItems()
         if selected_items:
             # Nur die erste ausgewählte Zelle verwenden, um die Zeilennummer zu erhalten
             row = selected_items[0].row()
             dialog = AddDataDialog()
-            # Daten in Dialogfeld setzen
+            
             for col in range(self.table_widget.columnCount()):
                 dialog_layout_item = dialog.layout().itemAt(col * 2, QFormLayout.FieldRole)
                 if dialog_layout_item is not None:
@@ -203,14 +204,22 @@ class MainWindow(QMainWindow):
                 self.update_table()
 
     def delete_data(self):
-        # Hier könntest du die ausgewählte Zeile der Tabelle löschen
-        pass
+        selected_rows = set(index.row() for index in self.table_widget.selectedIndexes())
+        if selected_rows:
+            reply = QMessageBox.question(self, 'Bestätigung', 'Möchten Sie die ausgewählte Zeile(n) löschen?', QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                for row in sorted(selected_rows, reverse=True):
+                    self.lagerverwaltung.delete_data(row + 1)  # Verwende row + 1, da Zeilenindex 0-basiert ist
+                self.update_table()  
+        else:
+            QMessageBox.information(self, 'Information', 'Bitte wählen Sie zuerst eine Zeile aus.')
+
 
     def delete_selected_row(self):
         selected_rows = set(index.row() for index in self.table_widget.selectedIndexes())
         for row in sorted(selected_rows, reverse=True):
             self.lagerverwaltung.delete_data(row + 1)  # Verwende row + 1, da Zeilenindex 0-basiert ist
-        self.update_table()  # Tabelle aktualisieren
+        self.update_table()  
 
     def update_table(self):
         # Daten aus der Datenbank abrufen und in die Tabelle einfügen
@@ -221,7 +230,7 @@ class MainWindow(QMainWindow):
                 self.table_widget.setItem(row_idx, col_idx, QTableWidgetItem(str(cell_data)))
 
     def show_image(self):
-        # Pfad zum Bild
+       
         image_path = "Pictures/overview.jpg"
         if os.path.exists(image_path):
             pixmap = QPixmap(image_path)
